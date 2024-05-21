@@ -1,11 +1,11 @@
 import java.rmi.server.UnicastRemoteObject;
-
 import javax.imageio.ImageIO;
 import java.awt.event.MouseEvent;
 import java.awt.AWTException;
 import java.awt.Robot;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.rmi.RemoteException;
 import java.awt.Rectangle;
@@ -19,6 +19,7 @@ public class SharingImpl extends UnicastRemoteObject implements SharingInterface
     BufferedImage screenshot;
     byte[] imageInByte;
     boolean isConnected = true;
+
 
     public SharingImpl(String serverId) throws RemoteException, AWTException {
         super();
@@ -107,6 +108,21 @@ public void receiveMousePosition(int x, int y, int eventType) throws RemoteExcep
   public void sendMousePosition(int x, int y, int eventType) throws RemoteException {
       receiveMousePosition(x, y, eventType);
   }
+
+    @Override
+    public byte[] downloadFile(String filePath) throws RemoteException {
+        try (FileInputStream fis = new FileInputStream(filePath);
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                baos.write(buffer, 0, bytesRead);
+            }
+            return baos.toByteArray();
+        } catch (IOException e) {
+            throw new RemoteException("Failed to download file", e);
+        }
+    }
   @Override
 public void receiveKeyPress(int keyCode, int eventType) throws RemoteException {
     switch (eventType) {

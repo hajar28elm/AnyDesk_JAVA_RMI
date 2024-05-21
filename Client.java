@@ -4,6 +4,8 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -28,13 +30,13 @@ public class Client extends JFrame implements MouseListener,KeyListener, MouseMo
             String url = "rmi://localhost/Server";
             server = (SharingInterface) Naming.lookup(url);
             server.registerClient(serverId);
+
             byte[] screenshotData = server.captureScreenshot();
             if (screenshotData == null) {
-                System.out.println("There is no sender with that ID");
-               throw new RemoteException("Failed to capture screenshot: null data received.");
-               
+                throw new RemoteException("Failed to capture screenshot: null data received.");
             }
-            BufferedImage resizedScreenshot = receiveScreenshot(server.captureScreenshot());
+
+            BufferedImage resizedScreenshot = receiveScreenshot(screenshotData);
             screenshotLabel = new JLabel(new ImageIcon(resizedScreenshot));
 
             panel = new JPanel();
@@ -52,22 +54,51 @@ public class Client extends JFrame implements MouseListener,KeyListener, MouseMo
             new Thread(() -> {
                 while (true) {
                     try {
-                        BufferedImage updatedScreenshot = receiveScreenshot(server.captureScreenshot());
-                        screenshotLabel.setIcon(new ImageIcon(updatedScreenshot));
-                        revalidate();
-                        repaint();
-                        Thread.sleep(1000 / 30); 
+                        byte[] updatedScreenshotData = server.captureScreenshot();
+                        if (updatedScreenshotData != null) {
+                            BufferedImage updatedScreenshot = receiveScreenshot(updatedScreenshotData);
+                            screenshotLabel.setIcon(new ImageIcon(updatedScreenshot));
+                            revalidate();
+                            repaint();
+                        }
+                        Thread.sleep(1000 / 30); // 30 frames per second
                     } catch (RemoteException | InterruptedException e) {
                         e.printStackTrace();
                     }
                 }
             }).start();
+
+            // Add button to request file download
+            JButton downloadButton = new JButton("Download File");
+            downloadButton.addActionListener(e -> selectAndDownloadFile());
+            panel.add(downloadButton);
+
         } else {
             System.out.println("Sender ID cannot be empty. Exiting...");
-            System.exit(0); 
+            System.exit(0); // Exit the application if no sender ID is provided
         }
     }
-
+     private void selectAndDownloadFile() {
+        JFileChooser fileChooser = new JFileChooser();
+        int returnValue = fileChooser.showOpenDialog(this);
+        if (returnValue == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            try {
+                byte[] fileData = server.downloadFile(selectedFile.getAbsolutePath());
+                saveFileToDisk(fileData, selectedFile.getName());
+            } catch (RemoteException e) {
+                JOptionPane.showMessageDialog(this, "Failed to download file: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    private void saveFileToDisk(byte[] fileData, String fileName) {
+        try (FileOutputStream fos = new FileOutputStream(new File(System.getProperty("user.home"), fileName))) {
+            fos.write(fileData);
+            JOptionPane.showMessageDialog(this, "File downloaded successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "Failed to save file: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
     public BufferedImage receiveScreenshot(byte[] imageData) throws RemoteException {
         try {
             InputStream in = new ByteArrayInputStream(imageData);

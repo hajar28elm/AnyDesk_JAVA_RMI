@@ -6,6 +6,7 @@ import java.rmi.registry.LocateRegistry;
 import java.net.InetAddress;
 
 public class SenderMain {
+
     public static void main(String[] args) {
         try {
              String serverId = JOptionPane.showInputDialog(null, "Enter Server ID:", "Server ID Input", JOptionPane.PLAIN_MESSAGE);
